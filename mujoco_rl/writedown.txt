@@ -1,0 +1,26 @@
+# Plan for Improving Humanoid Agent Performance
+
+1.  **Algorithm Comparison:**
+    *   Goal: Compare the performance of PPO, SAC, and TD3 on the standard `Humanoid-v5` environment.
+    *   Method: Modify `train_mujoco_agent.py` to accept a command-line argument (`--algo`) to select the algorithm. Train each for a fixed number of timesteps (e.g., 1 million) and compare evaluation results (mean reward).
+    *   Observe: Training speed, stability, and final performance.
+
+2.  **Hyperparameter Tuning (If Needed):**
+    *   Goal: Optimize the hyperparameters for the most promising algorithm(s) identified in step 1.
+    *   Method: Use tools like Optuna or perform manual searches on key parameters (e.g., learning rate, network size, algorithm-specific parameters like `buffer_size` for SAC/TD3).
+    *   Target: Further improve the mean reward and potentially the qualitative behavior (smoother animation).
+
+3.  **Introduce Obstacle Environment:**
+    *   Goal: Train the best-performing setup (algorithm + hyperparameters) on the custom Humanoid environment with obstacles.
+    *   Method:
+        *   Finalize the modified `humanoid.xml` in the `assets` folder.
+        *   Create `custom_envs.py` to register the `"HumanoidObstacle-v0"` environment.
+        *   Update the training script to use the custom environment ID.
+        *   Train the agent on the obstacle course.
+
+4.  **Evaluation on Obstacle Course:**
+    *   Goal: Assess how well the agent navigates the obstacles.
+    *   Method: Quantitative evaluation (mean reward) and qualitative visualization.
+
+---
+*Initial focus is on Step 1: Comparing PPO, SAC, and TD3 on `Humanoid-v5`.*
