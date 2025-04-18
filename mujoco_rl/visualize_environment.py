@@ -7,8 +7,7 @@ import os
 # Make sure this matches the environment the model was trained on
 env_name = "Humanoid-v5"
 # Path to the saved model file
-# Adjust the path separators if necessary for your OS, though '/' usually works
-model_path = "/Users/nehal/SixthSemester/ganLab/rl_project/ppo_Humanoid-v5_1000000.zip"
+model_path = os.path.join(os.path.dirname(__file__), "models", "ppo_Humanoid-v5_10000099.zip")
 # --- End Parameters ---
 
 # Check if the model file exists
@@ -40,7 +39,7 @@ except Exception as e:
 print("Visualizing trained agent performance...")
 obs, _ = vis_env.reset()
 episodes = 0
-max_episodes = 5 # Visualize for 5 episodes
+max_episodes = 50 # Visualize for 5 episodes
 
 while episodes < max_episodes:
     action, _states = model.predict(obs, deterministic=True)
