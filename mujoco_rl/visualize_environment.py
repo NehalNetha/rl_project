@@ -5,10 +5,10 @@ import os
 
 # --- Parameters ---
 # Make sure this matches the environment the model was trained on
-env_name = "Humanoid-v5"
+env_name = "Hopper-v5"
 # Path to the saved model file
-model_path = os.path.join(os.path.dirname(__file__), "models", "ppo_Humanoid-v5_10000099.zip")
-# --- End Parameters ---
+model_path = os.path.join(os.path.dirname(__file__), "models", "ppo_Hopper-v5_100000.zip")
+# --- End Parameters C:\Users\cl502_21\Downloads\rl_new\rl_project\mujoco_rl\models\ppo_Hopper-v5_100000.zip
 
 # Check if the model file exists
 if not os.path.exists(model_path):

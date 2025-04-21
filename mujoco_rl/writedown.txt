@@ -4,6 +4,12 @@
     *   Goal: Compare the performance of PPO, SAC, and TD3 on the standard `Humanoid-v5` environment.
     *   Method: Modify `train_mujoco_agent.py` to accept a command-line argument (`--algo`) to select the algorithm. Train each for a fixed number of timesteps (e.g., 1 million) and compare evaluation results (mean reward).
     *   Observe: Training speed, stability, and final performance.
+    *   *Update (PPO Stability):* Based on initial PPO runs showing loss instability around 5M steps, adjusted PPO hyperparameters in `train_mujoco_agent.py`:
+        *   Reduced initial learning rate to `5e-5`.
+        *   Implemented linear learning rate decay.
+        *   Reduced `n_epochs` from 15 to 10.
+        *   Reduced `ent_coef` from 0.005 to 0.001.
+        *   (Optional) Reduced network size to `[256, 256]` for policy and value functions.
 
 2.  **Hyperparameter Tuning (If Needed):**
     *   Goal: Optimize the hyperparameters for the most promising algorithm(s) identified in step 1.

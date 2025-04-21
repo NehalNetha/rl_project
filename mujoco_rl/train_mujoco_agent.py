@@ -5,6 +5,7 @@ from stable_baselines3.common.env_util import make_vec_env
 import os
 import time
 import argparse
+from typing import Callable # Import Callable for learning rate schedule
 
 # --- Argument Parsing ---python c:\Users\cl502_21\Downloads\rl_new\rl_project\mujoco_rl\train_mujoco_agent.py --algo PPO --env Humanoid-v5 --timesteps 500000 --checkpoint c:\Users\cl502_21\Downloads\rl_new\rl_project\mujoco_rl\models\ppo_Humanoid-v5_1000000.zip
 parser = argparse.ArgumentParser(description="Train RL agents on MuJoCo environments")
@@ -13,7 +14,8 @@ parser.add_argument("--algo", type=str.upper, default="PPO", choices=["PPO", "SA
 parser.add_argument("--env", type=str, default="Humanoid-v5", help="Environment ID")
 parser.add_argument("--timesteps", type=int, default=1_000_000, help="Total training timesteps for this session")
 parser.add_argument("--seed", type=int, default=None, help="Random seed for reproducibility")
-parser.add_argument("--checkpoint", type=str, default=None, help="Path to a model checkpoint to load and continue training") # Add this line
+parser.add_argument("--checkpoint", type=str, default=None, help="Path to a model checkpoint to load and continue training")
+parser.add_argument("--device", type=str, default="cuda", choices=["cuda", "cpu"], help="Device to use for training (cuda or cpu)") # Add this line
 args = parser.parse_args()
 # --- End Argument Parsing ---
 
@@ -23,7 +25,8 @@ env_name = args.env
 algorithm = args.algo
 total_timesteps = args.timesteps
 seed = args.seed
-checkpoint_path = args.checkpoint # Store the checkpoint path
+checkpoint_path = args.checkpoint
+device = args.device # Add this line
 log_dir = os.path.join(os.path.dirname(__file__), "logs")
 model_dir = os.path.join(os.path.dirname(__file__), "models")
 # Path to the existing model # Remove this line, it's replaced by the argument
@@ -31,6 +34,28 @@ model_dir = os.path.join(os.path.dirname(__file__), "models")
 os.makedirs(log_dir, exist_ok=True)
 os.makedirs(model_dir, exist_ok=True)
 # --- End Configuration ---
+
+# --- Learning Rate Schedule ---
+def linear_schedule(initial_value: float) -> Callable[[float], float]:
+    """
+    Linear learning rate schedule.
+
+    :param initial_value: Initial learning rate.
+    :return: schedule that computes
+      current learning rate depending on remaining progress
+    """
+    def func(progress_remaining: float) -> float:
+        """
+        Progress will decrease from 1 (beginning) to 0.
+
+        :param progress_remaining: 1.0 at the start, 0.0 at the end of training
+        :return: current learning rate
+        """
+        return progress_remaining * initial_value
+
+    return func
+# --- End Learning Rate Schedule ---
+
 
 env = gym.make(env_name)
 eval_env = gym.make(env_name)
@@ -79,75 +104,82 @@ if user_input.lower() == 'q':
 # --- Agent Initialization ---
 if checkpoint_path and os.path.exists(checkpoint_path):
     print(f"Loading existing model from {checkpoint_path}")
-    model = eval(algorithm).load(checkpoint_path, env=env, device="cuda")
-    # Optionally reset the learning rate for continued training
-    model.learning_rate = 3e-4
+    # Use the device argument when loading
+    # When loading, you might want to reset the learning rate schedule
+    # or continue with the state it was saved in (default behavior).
+    # For simplicity, we'll let SB3 handle it, but you could pass a new schedule:
+    # custom_objects = {"learning_rate": linear_schedule(3e-5)} # Example smaller LR
+    # model = eval(algorithm).load(checkpoint_path, env=env, device=device, custom_objects=custom_objects)
+    model = eval(algorithm).load(checkpoint_path, env=env, device=device)
+
 else:
-    print("No existing model found. Starting fresh training.")
+    print(f"No existing model found. Starting fresh training on device: {device}")
+    # Remove the duplicate common_params definition
+    # common_params = {
+    #     "policy": "MlpPolicy",
+    #     "env": env,
+    #     "verbose": 1,
+    #     "seed": seed,
+    #     "device": device, # This was incorrect here before
+    # }
     common_params = {
         "policy": "MlpPolicy",
         "env": env,
         "verbose": 1,
+        "tensorboard_log": log_dir,
         "seed": seed,
- "device": device,
-}
-common_params = {
-    "policy": "MlpPolicy",
-    "env": env,
-    "verbose": 1,
-    "tensorboard_log": log_dir,
-    "seed": seed,
-    "device": "cuda",  # Add this line to enable CUDA
-    # Add other common parameters like learning rate if desired,
-    # but defaults might differ significantly between algos.
-    # We'll start with defaults.
-}
+        "device": device,  # Use the device variable from args
+        # Add other common parameters like learning rate if desired,
+        # but defaults might differ significantly between algos.
+        # We'll start with defaults.
+    }
 
-if algorithm == "PPO":
-    # PPO specific params with enhanced network and learning settings
-    model = PPO(
-        policy_kwargs=dict(
-            net_arch=dict(
-                pi=[256, 256, 256],  # Deeper policy network
-                vf=[256, 256, 256]   # Deeper value network
-            )
-        ),
-        learning_rate=1e-4,  # Smaller learning rate for fine-tuning
-        n_steps=4096,        # Increased steps per update
-        batch_size=128,      # Larger batch size
-        n_epochs=15,         # More epochs per update
-        gamma=0.99,
-        gae_lambda=0.95,
-        clip_range=0.2,
-        ent_coef=0.005,      # Slightly increased exploration
-        **common_params
-    )
-elif algorithm == "SAC":
-    # SAC uses a replay buffer, defaults are often good starting points
-    model = SAC(
-         # learning_rate=3e-4, # Often default works well
-         buffer_size=total_timesteps, # Store most experiences
-         learning_starts=10000, # Start learning after 10k steps
-         batch_size=256, # Common default
-         gamma=0.99,
-         # train_freq=(1, "step"), # Default
-         # gradient_steps=-1, # Default
-         **common_params
-    )
-elif algorithm == "TD3":
-    # TD3 also uses a replay buffer
-     model = TD3(
-         # learning_rate=1e-3, # Often default works well
-         buffer_size=total_timesteps,
-         learning_starts=10000,
-         batch_size=100, # Common default
-         gamma=0.99,
-         # train_freq=(1, "episode"), # Default for TD3 is episode
-         # gradient_steps=-1, # Default
-         **common_params
-     )
-else:
-    raise ValueError(f"Algorithm {algorithm} not supported.")
+    if algorithm == "PPO":
+        # PPO specific params with potentially more stable settings
+        initial_lr = 5e-5 # Reduced initial learning rate
+        model = PPO(
+            policy_kwargs=dict(
+                net_arch=dict(
+                    pi=[256, 256],  # Slightly smaller network might generalize better
+                    vf=[256, 256]
+                )
+            ),
+            learning_rate=linear_schedule(initial_lr), # Use linear schedule
+            n_steps=4096,        # Keep increased steps per update
+            batch_size=128,      # Keep batch size (could increase if memory allows)
+            n_epochs=10,         # Reduced epochs per update
+            gamma=0.99,
+            gae_lambda=0.95,
+            clip_range=0.2,      # Keep standard clip range
+            ent_coef=0.001,      # Slightly reduced exploration emphasis
+            **common_params
+        )
+    elif algorithm == "SAC":
+        # SAC uses a replay buffer, defaults are often good starting points
+        model = SAC(
+             # learning_rate=3e-4, # Often default works well
+             buffer_size=total_timesteps, # Store most experiences
+             learning_starts=10000, # Start learning after 10k steps
+             batch_size=256, # Common default
+             gamma=0.99,
+             # train_freq=(1, "step"), # Default
+             # gradient_steps=-1, # Default
+             **common_params
+        )
+    elif algorithm == "TD3":
+        # TD3 also uses a replay buffer
+         model = TD3(
+             # learning_rate=1e-3, # Often default works well
+             buffer_size=total_timesteps,
+             learning_starts=10000,
+             batch_size=100, # Common default
+             gamma=0.99,
+             # train_freq=(1, "episode"), # Default for TD3 is episode
+             # gradient_steps=-1, # Default
+             **common_params
+         )
+    else:
+        raise ValueError(f"Algorithm {algorithm} not supported.")
 
 print(f"Initialized {algorithm} model.")
 # --- End Agent Initialization ---
